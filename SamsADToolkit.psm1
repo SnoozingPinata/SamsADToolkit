@@ -170,7 +170,19 @@ Function Test-ADUser {
     }
 }
 
+function Disable-OldComputers {
+    $disabledComputersOU = #MAKE SURE TO ADD AN OU DISTINGUISHED NAME HERE.
+    $inactivityThreshold = 90
 
+    $cutoffDate = (Get-Date).AddDays(-($inactivityThreshold))
+
+    $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
+
+    foreach ($computer in $allComputersList) {
+        Set-ADComputer $computer -Enabled $false -Description "Compuer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
+        Move-ADObject -Identity $computer.ObjectGUID -TargetPath $disabledComputersOU
+    }
+}
 
 <# These are different version of the Get-UnassignedComputers function. Could add in some more functionality and combine all of these together in the future, but I don't think there's a need currently. 
 # Gets all of the unassigned computers in the domain.  
