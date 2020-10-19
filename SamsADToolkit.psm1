@@ -171,16 +171,32 @@ Function Test-ADUser {
 }
 
 function Disable-OldComputers {
-    $disabledComputersOU = #MAKE SURE TO ADD AN OU DISTINGUISHED NAME HERE.
-    $inactivityThreshold = 90
+    [CmdletBinding()]
+    Param(
+        [Parameter(
+            Position=0,
+            Mandatory=$true)]
+        [int] $InactivityThreshold,
 
-    $cutoffDate = (Get-Date).AddDays(-($inactivityThreshold))
+        [Parameter(
+            Position=1,
+            Mandatory=$false,
+            ValueFromPipeline=$true)]
+        [string] $DisabledComputersOU
+    )
 
+    $cutoffDate = (Get-Date).AddDays(-($InactivityThreshold))
     $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
 
-    foreach ($computer in $allComputersList) {
-        Set-ADComputer $computer -Enabled $false -Description "Compuer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
-        Move-ADObject -Identity $computer.ObjectGUID -TargetPath $disabledComputersOU
+    if ($DisabledComputersOU) {
+        foreach ($computer in $allComputersList) {
+            Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
+            Move-ADObject -Identity $computer.ObjectGUID -TargetPath $DisabledComputersOU
+        }
+    } else {
+        foreach ($computer in $allComputersList) {
+            Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
+        }
     }
 }
 
