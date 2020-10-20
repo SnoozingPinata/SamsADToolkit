@@ -28,7 +28,7 @@ function Get-UnassignedComputers {
 }
 
 
-# Assign Computer to User. Requires username and computername input. Accepts username input from pipeline. 
+# Requires username and computername input. Accepts username input from pipeline. Sets the computer's managedby attribute to the user given.
 function Set-ComputerAssignment {
     [CmdletBinding()]
     Param (
@@ -47,7 +47,7 @@ function Set-ComputerAssignment {
 }
 
 
-# Clears the assignment on a computer object in AD. 
+# Clears the assignment on a computer object in AD. Adds a description with the date/time.
 function Remove-ComputerAssignment {
     [CmdletBinding()]
     Param (
@@ -61,43 +61,30 @@ function Remove-ComputerAssignment {
 
 
 # Gets all the members in group one and adds them to group two.
-# Need to clean this up a bit. Need to change the name because the sync verb is innacurate. Copy-GroupMembers is more accurate. The commented code at the bottom would be more akin to a Move-GoupMembers command.
-function Sync-GroupMembership {
+function Copy-GroupMembership {
     [CmdletBinding()]
     Param (
         [Parameter(
             Mandatory=$true,
             ValueFromPipeline=$true,
             Position=0)]
-        [string] $OldGroup,
+        [string] $OriginalGroup,
 
         [Parameter(
             Mandatory=$true,
             Position=1)]
-        [string] $DestinationGroup <#,
-
-        [Parameter(
-            Position=2)]
-        [switch] $Delete #>
+        [string] $DestinationGroup
     )
 
     $initialCount = (Get-ADGroupMember -Identity $DestinationGroup).count
 
-    Get-ADGroupMember -Identity $OldGroup | ForEach-Object -Process {
+    Get-ADGroupMember -Identity $OriginalGroup | ForEach-Object -Process {
         Add-ADGroupMember -Identity $DestinationGroup -Members $_.distinguishedName
     }
 
     If ((Get-ADGroupMember -Identity $DestinationGroup).count -gt $initialCount) {
         Write-Output "Transfer Successful."
     }
-
-    <#
-    If ($Delete) {
-        If ((Get-ADGroupMember -Identity $DestinationGroup) -contains $OldGroup) {
-            Remove-ADGroupMember -Identity $DestinationGroup -Members $OldGroup
-        }
-    }
-    #>
 }
 
 
