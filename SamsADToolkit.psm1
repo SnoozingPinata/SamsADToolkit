@@ -200,6 +200,36 @@ function Disable-OldComputers {
     }
 }
 
+function Add-EmailAlias {
+    [CmdletBinding()]
+    Param(
+        [Parameter(
+            Position=0,
+            ValueFromPipeline=$true,
+            Mandatory=$true)]
+        [string] $Username,
+
+        [Parameter(
+            Position=1,
+            Mandatory=$true)]
+        [string] $EmailDomain
+    )
+
+    Begin {
+
+    }
+
+    Process {
+        $userObject = Get-ADUser -Identity $Username -Properties "proxyaddresses"
+        $newEmailAddress = $($userObject.SamAccountName) + $($EmailDomain)
+        Set-ADUser -Identity $userObject.ObjectGUID -add @{ProxyAddresses="smtp:$($newEmailAddress)"}
+    }
+
+    End {
+
+    }
+}
+
 <# These are different version of the Get-UnassignedComputers function. Could add in some more functionality and combine all of these together in the future, but I don't think there's a need currently. 
 # Gets all of the unassigned computers in the domain.  
 function Get-UnassignedComputers {
