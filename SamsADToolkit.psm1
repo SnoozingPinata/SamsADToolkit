@@ -9,8 +9,8 @@ function Get-AssignedComputers {
             Mandatory=$true)]
         [string[]] $UserName
     )
-    $searchResult = Get-ADComputer -Filter "ManagedBy -eq '$UserName'"
-    $searchResult.Name
+
+    Get-ADComputer -Filter "ManagedBy -eq '$UserName'"
 }
 
 
