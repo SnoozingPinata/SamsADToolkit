@@ -217,6 +217,35 @@ function Add-EmailAlias {
     }
 }
 
+function Start-ADCloudUpdate {
+    [Cmdletbinding()]
+    param(
+        [Parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$true,
+            Position=0)]
+        $ADSyncServer,
+
+        [Parameter(
+            Mandatory=$true,
+            Position=1)]
+        [ValidateNotNull()]
+        [System.Management.Automation.PSCredential]
+        [System.Management.Automation.Credential()]
+        $Credential
+    )
+    Invoke-Command -ComputerName $ADSyncServer -Credential $Credential -ScriptBlock {
+        if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
+            if ([int](Get-CimInstance -Class Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber) -ge 6000) {
+                $CommandLine = "-File `"" + $MyInvocation.MyCommand.Path + "`" " + $MyInvocation.UnboundArguments
+                Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList $CommandLine
+                Exit
+            }
+        }
+        Start-ADSyncSyncCycle -PolicyType Delta
+    }
+}
+
 <# These are different version of the Get-UnassignedComputers function. Could add in some more functionality and combine all of these together in the future, but I don't think there's a need currently. 
 # Gets all of the unassigned computers in the domain.  
 function Get-UnassignedComputers {
