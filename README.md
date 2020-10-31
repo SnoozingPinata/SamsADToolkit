@@ -1,4 +1,8 @@
 # SamsADToolkit
+
+DISCLAIMER: This project is an extreme work in progress. Many cmdlets in the samsadtoolkit.psm1 can be used, however they do not have descriptions and are not complete yet. 
+
+
 Various tools for managing Active Directory
 
 Get-AssignedComputers
