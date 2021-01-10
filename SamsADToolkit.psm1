@@ -1,67 +1,182 @@
-# Returns the name of each computer that is assigned. Requires username input. 
-# Should possibly make a -laptop -surface -desktop switch that will only search the related OU. 
-function Get-AssignedComputers {
+function Get-ComputerAssignment {
+    <#
+        .SYNOPSIS
+        Returns the name of each computer that is assigned to a user or returns all unassigned computers.
+
+        .DESCRIPTION
+        Returns the name of each computer that is assigned to a user or returns all unassigned computers. 
+        Either Username must be defined or Unassigned must be used. 
+
+        .PARAMETER UserName
+        Returns all computers that are set as managed by for the user. 
+
+        .PARAMETER Unassigned
+        Switch: Returns the name of all enabled computers that do not have a value in the "ManagedBy" attribute.
+
+        .INPUTS
+
+
+        .OUTPUTS
+
+
+        .EXAMPLE
+        Get-ComputerAssignment -Unassigned
+        SpareComputer01
+
+        .EXAMPLE
+        Get-ComputerAssignment -UserName HWallace
+        Desktop-HWallace
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [CmdletBinding()]
     Param (
         [Parameter(
             Position=0,
-            ValueFromPipeline=$true,
-            Mandatory=$true)]
-        [string[]] $UserName
+            ValueFromPipeline=$true)]
+        [string[]] $UserName,
+
+        [Parameter(
+            Position=1)]
+        [switch] $Unassigned
     )
 
-    Get-ADComputer -Filter "ManagedBy -eq '$UserName'"
-}
+    Begin {
+    }
 
-
-# Find Unassigned Computers in multiple target OUs
-# Need to get these explicit variables out of here before this can go public. 
-function Get-UnassignedComputers {
-    $searchableOUs = "OU=Apple Mac Computers,OU=Computers,OU=_SWC,DC=sw-construction,DC=com", "OU=Desktops,OU=Computers,OU=_SWC,DC=sw-construction,DC=com", "OU=Laptops,OU=Computers,OU=_SWC,DC=sw-construction,DC=com", "OU=Surface_Tablets,OU=Computers,OU=_SWC,DC=sw-construction,DC=com"
-    $searchableOus | ForEach-Object -Process {
-        Get-ADComputer -Filter "Enabled -eq '$true'" -Properties * -SearchBase $_ | ForEach-Object -Process {
-            If (-Not $_.ManagedBy) {
-                Write-Output $_.Name
+    Process {
+        # Runs if the $Unassigned switch was used. 
+        # Return the name of all enabled computers that are not assigned in AD.
+        # Should rewrite this to use the filter instead of ForEach-Object and if.
+        if ($Unassigned) {
+            Get-ADComputer -Filter "Enabled -eq '$true'" -Properties * -SearchBase $_ | ForEach-Object -Process {
+                If (-Not $_.ManagedBy) {
+                    Write-Output $_.Name
+                }
             }
+        } elseif ($UserName){
+            # Searches AD for computers that have a ManagedBy attribute equal to the username parameter.
+            Get-ADComputer -Filter "ManagedBy -eq '$UserName'"
+        } else {
+            throw "Either Username must be defined or Unassigned switch must be used."
         }
+    }
+
+    End {
     }
 }
 
 
-# Requires username and computername input. Accepts username input from pipeline. Sets the computer's managedby attribute to the user given.
 function Set-ComputerAssignment {
+        <#
+        .SYNOPSIS
+        Sets the computer's managedby attribute to the user given.
+
+        .DESCRIPTION
+        Sets the computer's managedby attribute to the user given.
+        Requires username and computername input. 
+        Accepts username input from pipeline. 
+
+        .PARAMETER UserName
+        Required if not using the RemoveAssignment switch.
+        Type the username of the user you are assigning the computer to.
+
+        .PARAMETER ComputerName
+        Always required. This is the computer name 
+
+        .PARAMETER RemoveAssignment
+        Switch: Clears the assignment on the specified computer in AD. Adds a description with the date/time.
+
+        .INPUTS
+        ComputerName accepts value from pipeline as a string.
+
+        .OUTPUTS
+        None.
+
+        .EXAMPLE
+        Set-ComputerAssignment -ComputerName Desktop01 -RemoveAssignment
+
+        .EXAMPLE
+        Set-ComputerAssignment -ComputerName Desktop01 -UserName HWallace
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [CmdletBinding()]
     Param (
         [Parameter(
             Position=0,
-            ValueFromPipeline=$true,
-            Mandatory=$true)]
-        [string[]] $UserName,
-
-        [Parameter(
-            Position=1,
-            Mandatory=$true)]
-        [string[]] $ComputerName
-    )
-    Set-ADComputer -Identity $($ComputerName) -ManagedBy (Get-ADUser -Identity $($UserName)) -Description $($UserName)
-}
-
-
-# Clears the assignment on a computer object in AD. Adds a description with the date/time.
-function Remove-ComputerAssignment {
-    [CmdletBinding()]
-    Param (
-        [Parameter(
             Mandatory=$true,
             ValueFromPipeline=$true)]
-        [string] $ComputerName
+        [string[]] $ComputerName,
+
+        [Parameter(
+            Position=1)]
+        [string] $UserName,
+
+        [Parameter()]
+        [switch] $RemoveAssignment
     )
-    Set-ADComputer -Identity $ComputerName -Clear ManagedBy -Description "Unassigned via script on $(Get-Date)"
+
+    Begin {
+    }
+
+    Process {
+        # if RemoveAssignment switch was used, clears the ManagedBy attribute for the computer in AD. Changes the description.
+            # if RemoveAssignment is not set, checks to make sure UserName parameter is defined.
+                # if UserName is not defined, throws an error explaining UserName is required when not using the RemoveAssignment switch
+        if ($RemoveAssignment) {
+            Set-ADComputer -Identity $ComputerName -Clear ManagedBy -Description "Unassigned via script on $(Get-Date)"
+        } elseif (-not $($UserName)) {
+            throw "Either Username must be defined or RemoveAssignment switch must be used."
+        }
+        # Updates the ManagedBy attribute in AD with the user's username. Updates the Description.
+        Set-ADComputer -Identity $($ComputerName) -ManagedBy (Get-ADUser -Identity $($UserName)) -Description $($UserName)
+    }
+
+    End {
+    }
 }
 
-
-# Gets all the members in group one and adds them to group two.
 function Copy-GroupMembership {
+    <#
+        .SYNOPSIS
+        Gets all the members in group one and adds them to group two.
+
+        .DESCRIPTION
+        Gets all the members in group one and adds them to group two. Note that it does not remove any additional members from group two. 
+
+
+        .PARAMETER OriginalGroup
+
+
+        .PARAMETER DestinationGroup
+
+        .INPUTS
+
+
+        .OUTPUTS
+
+
+        .EXAMPLE
+
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [CmdletBinding()]
     Param (
         [Parameter(
@@ -76,88 +191,56 @@ function Copy-GroupMembership {
         [string] $DestinationGroup
     )
 
-    $initialCount = (Get-ADGroupMember -Identity $DestinationGroup).count
-
-    Get-ADGroupMember -Identity $OriginalGroup | ForEach-Object -Process {
-        Add-ADGroupMember -Identity $DestinationGroup -Members $_.distinguishedName
+    Begin {
     }
 
-    If ((Get-ADGroupMember -Identity $DestinationGroup).count -gt $initialCount) {
-        Write-Output "Transfer Successful."
+    Process {
+        $initialCount = (Get-ADGroupMember -Identity $DestinationGroup).count
+
+        Get-ADGroupMember -Identity $OriginalGroup | ForEach-Object -Process {
+            Add-ADGroupMember -Identity $DestinationGroup -Members $_.distinguishedName
+        }
+    
+        If ((Get-ADGroupMember -Identity $DestinationGroup).count -gt $initialCount) {
+            Write-Output "Transfer Successful."
+        }
     }
-}
 
-
-# Takes a username or firstname and lastname as input. Returns true if there is exactly 1 object in AD with that first name and last name. Returns false if there are none.
-# This is a work in progress - doesn't work at all yet. 
-Function Test-ADUser {
-    [CmdletBinding()]
-    Param (
-        [Parameter(
-            Position=0,
-            Mandatory=$false,
-            ValueFromPipeline=$true)]
-        [string] $UserName,
-
-        [Parameter(
-            Position=1,
-            Mandatory=$false)]
-        [string] $FirstName,
-
-        [Parameter(
-            Position=2,
-            Mandatory=$false)]
-        [string] $LastName
-    )
-
-    # Probably need to add a begin block and then separate out the logic in the below area into 3 different functions. One to test username, one to test first name, and one to test lastname. Then just call the associated function in the correct place.
-    # Want to put a lot of output but all of it in verbose so that without -verbose set, it always returns true or false.
-
-    If ( -not ($UserName)) {
-        Write-Verbose "No UserName input detected."
-        If (($FirstName) -and ($LastName)) {
-            Write-Verbose "Detected both FirstName and LastName input."
-            # This needs to be fixed. It will fail if it doesn't find anything.
-            If ((Get-ADUser -Identity ($($FirstName)[0] + $($LastName)) | Measure-Object).count -eq 1) {
-                Return $true
-            } Else {
-                # Need to search for a username with firstnamelastname because that's what we do when we have a conflict.
-            }
-        } ElseIf ($FirstName) {
-            If ((Get-ADUser -Filter "GivenName -eq '$FirstName'" | Measure-Object).count -eq 1) {
-                Return $true
-            } Else {
-                Return $false
-            }
-        } ElseIF ($LastName) {
-            If ((Get-ADUser -Filter "SurName -eq '$LastName'" | Measure-Object).count -eq 1) {
-                Return $true
-            } Else {
-                Return $false
-            }
-        } Else {
-            Write-Verbose "You must enter a UserName, FirstName, or LastName."
-            Return $false
-        }
-    } ElseIf ($UserName) {
-        Write-Verbose "Username input detected."
-        try {
-            If ((Get-ADUser -Identity $UserName | Measure-Object).count -eq 1) {
-                Return $true
-            } Else {
-                Return $false
-            }
-        }
-        catch {
-            Write-Verbose "No account exists with the username $($UserName)."
-            Return $false
-        }
-    } Else {
-        Return $false
+    End {
     }
 }
 
 function Disable-OldComputers {
+    <#
+        .SYNOPSIS
+        Disables computer accounts within Active Directory that have not been logged into in X days.
+
+
+        .DESCRIPTION
+
+
+
+        .PARAMETER InactivityThreshold
+
+
+        .PARAMETER DisabledComputersOU
+
+        .INPUTS
+
+
+        .OUTPUTS
+
+
+        .EXAMPLE
+
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [CmdletBinding()]
     Param(
         [Parameter(
@@ -172,22 +255,60 @@ function Disable-OldComputers {
         [string] $DisabledComputersOU
     )
 
-    $cutoffDate = (Get-Date).AddDays(-($InactivityThreshold))
-    $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
+    Begin {
+    }
 
-    if ($DisabledComputersOU) {
-        foreach ($computer in $allComputersList) {
-            Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
-            Move-ADObject -Identity $computer.ObjectGUID -TargetPath $DisabledComputersOU
+    Process {
+        $cutoffDate = (Get-Date).AddDays(-($InactivityThreshold))
+        $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
+    
+        if ($DisabledComputersOU) {
+            foreach ($computer in $allComputersList) {
+                Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
+                Move-ADObject -Identity $computer.ObjectGUID -TargetPath $DisabledComputersOU
+            }
+        } else {
+            foreach ($computer in $allComputersList) {
+                Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
+            }
         }
-    } else {
-        foreach ($computer in $allComputersList) {
-            Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
-        }
+    }
+
+    End {
     }
 }
 
 function Add-EmailAlias {
+    <#
+        .SYNOPSIS
+
+
+
+        .DESCRIPTION
+
+
+
+        .PARAMETER Username
+
+
+        .PARAMETER EmailDomain
+
+        .INPUTS
+
+
+        .OUTPUTS
+
+
+        .EXAMPLE
+
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [CmdletBinding()]
     Param(
         [Parameter(
@@ -203,7 +324,6 @@ function Add-EmailAlias {
     )
 
     Begin {
-
     }
 
     Process {
@@ -213,11 +333,41 @@ function Add-EmailAlias {
     }
 
     End {
-
     }
 }
 
 function Start-ADCloudUpdate {
+    <#
+        .SYNOPSIS
+        Sends local server the command to begin a delta sync with O365.
+
+        .DESCRIPTION
+        Sends local server the command to begin a delta sync with O365.
+        Uses Invoke-Command. 
+        Must have Remote Management configured for the target server and must also use the AD Sync Tool from Microsoft.
+
+        .PARAMETER ADSyncServer
+        Mandatory. Sends the Delta ADSync code to this server via Invoke-Command.
+
+        .PARAMETER Credential
+        Mandatory. Accepts a PSCredential or Credential object.
+
+        .INPUTS
+        ADSyncServer parameter accepts string input from pipeline.
+
+        .OUTPUTS
+        None.
+
+        .EXAMPLE
+        Start-ADCloudUpdate -ADSyncServer DC01 -Credential (Get-Credential)
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
     [Cmdletbinding()]
     param(
         [Parameter(
@@ -245,29 +395,3 @@ function Start-ADCloudUpdate {
         Start-ADSyncSyncCycle -PolicyType Delta
     }
 }
-
-<# These are different version of the Get-UnassignedComputers function. Could add in some more functionality and combine all of these together in the future, but I don't think there's a need currently. 
-# Gets all of the unassigned computers in the domain.  
-function Get-UnassignedComputers {
-    $unassignedComputers = @()
-    Get-ADComputer -Filter "Enabled -eq '$true'" -Properties * | ForEach-Object -Process {
-        If (-Not $_.ManagedBy) {
-            $unassignedComputers += $_.Name
-        }
-    }
-    $unassignedComputers
-}
-
-
-
-# Find Unassigned Computers in target OU
-function Get-UnassignedUserComputers {
-    $unassignedComputers = @()
-    Get-ADComputer -Filter "Enabled -eq '$true'" -Properties * -SearchBase "OU=Computers,OU=_SWC,DC=sw-construction,DC=com" | ForEach-Object -Process {
-        If (-Not $_.ManagedBy) {
-            $unassignedComputers += $_.Name
-        }
-    }
-    $unassignedComputers
-}
-#>
