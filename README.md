@@ -1,12 +1,20 @@
 # SamsADToolkit
+A collection of powershell commands used to streamline and ease the administration of Active Directory.
 
-DISCLAIMER: This project is an extreme work in progress. Many cmdlets in the samsadtoolkit.psm1 can be used, however they do not have descriptions and are not complete yet. 
+Get-ComputerAssignment
+    Returns the name of each computer that is assigned to a user or returns all unassigned computers.
 
+Set-ComputerAssignment
+    Sets the computer's managedby attribute to the username of the input user. Also sets the description to the username.
 
-Various tools for managing Active Directory
+Copy-GroupMembership
+    Gets all the members in group one and adds them to another group.
 
-Get-AssignedComputers
-    Required Paramters: UserName
-    Description: Returns each AD computer object with a managedby attribute that matches the username input.
+Disable-OldComputers
+    Disables computer accounts within Active Directory that have not been logged into in 90 days.
 
-Check the comments on the tools before you use them. Many of them need some polish. 
+Add-EmailAlias
+    Adds an email alias for the user via active directory.
+
+Start-ADCloudUpdate
+    Sends local server the command to begin a delta sync with O365.

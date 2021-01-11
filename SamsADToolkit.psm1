@@ -14,10 +14,10 @@ function Get-ComputerAssignment {
         Switch: Returns the name of all enabled computers that do not have a value in the "ManagedBy" attribute.
 
         .INPUTS
-
+        UserName accepts input from pipeline.
 
         .OUTPUTS
-
+        Writes the name of the computer object.
 
         .EXAMPLE
         Get-ComputerAssignment -Unassigned
@@ -61,9 +61,9 @@ function Get-ComputerAssignment {
             }
         } elseif ($UserName){
             # Searches AD for computers that have a ManagedBy attribute equal to the username parameter.
-            Get-ADComputer -Filter "ManagedBy -eq '$UserName'"
+            (Get-ADComputer -Filter "ManagedBy -eq '$UserName'").Name
         } else {
-            throw "Either Username must be defined or Unassigned switch must be used."
+            throw "UserName is not defined and Unassigned switch was not used. Use Get-Help Get-ComputerAssignment -full for details."
         }
     }
 
@@ -71,11 +71,10 @@ function Get-ComputerAssignment {
     }
 }
 
-
 function Set-ComputerAssignment {
         <#
         .SYNOPSIS
-        Sets the computer's managedby attribute to the user given.
+        Sets the computer's managedby attribute to the username of the input user. Also sets the description to the username.
 
         .DESCRIPTION
         Sets the computer's managedby attribute to the user given.
@@ -150,25 +149,25 @@ function Set-ComputerAssignment {
 function Copy-GroupMembership {
     <#
         .SYNOPSIS
-        Gets all the members in group one and adds them to group two.
+        Gets all the members in group one and adds them to another group.
 
         .DESCRIPTION
-        Gets all the members in group one and adds them to group two. Note that it does not remove any additional members from group two. 
-
+        Gets all the members in group one and adds them to another group. Note that it does not remove any additional members from group two. 
 
         .PARAMETER OriginalGroup
-
+        This is the group you want to get all the members from.
 
         .PARAMETER DestinationGroup
+        This is the group that is going to get all of the members that the Orginal Group has.
 
         .INPUTS
-
+        OriginalGroup accepts pipeline input.
 
         .OUTPUTS
-
+        None.
 
         .EXAMPLE
-
+        Copy-GroupMembership -OriginalGroup SalesEmailList -DestinationGroup SalesSharePointAccess
 
         .LINK
         Github source: https://github.com/SnoozingPinata/SamsADToolkit
@@ -201,8 +200,10 @@ function Copy-GroupMembership {
             Add-ADGroupMember -Identity $DestinationGroup -Members $_.distinguishedName
         }
     
+        # This is not good validation. Can get a list of both arrays and use compare-object to check. 
+        # Need to rewrite this in the future.
         If ((Get-ADGroupMember -Identity $DestinationGroup).count -gt $initialCount) {
-            Write-Output "Transfer Successful."
+            Write-Verbose "Transfer Successful."
         }
     }
 
@@ -213,26 +214,26 @@ function Copy-GroupMembership {
 function Disable-OldComputers {
     <#
         .SYNOPSIS
-        Disables computer accounts within Active Directory that have not been logged into in X days.
-
+        Disables computer accounts within Active Directory that have not been logged into in 90 days.
 
         .DESCRIPTION
-
-
+        Disables all computers that have not logged in for 90 days.
+        The amount of days to check against can be changed with the InactivityThreshold parameter.
 
         .PARAMETER InactivityThreshold
-
+        Default is set to 90 days.
 
         .PARAMETER DisabledComputersOU
+        Distinguished name of an Organizational Unit that disabled computers should be moved to. 
 
         .INPUTS
-
+        DisabledComputersOU accepts a distinguished name for an organizational unit from the pipeline.
 
         .OUTPUTS
-
+        None.
 
         .EXAMPLE
-
+        Disable-OldComputers -InactivityThreshold 60
 
         .LINK
         Github source: https://github.com/SnoozingPinata/SamsADToolkit
@@ -244,9 +245,8 @@ function Disable-OldComputers {
     [CmdletBinding()]
     Param(
         [Parameter(
-            Position=0,
-            Mandatory=$true)]
-        [int] $InactivityThreshold,
+            Position=0)]
+        [int] $InactivityThreshold = 90,
 
         [Parameter(
             Position=1,
@@ -281,26 +281,25 @@ function Disable-OldComputers {
 function Add-EmailAlias {
     <#
         .SYNOPSIS
-
-
+        Adds an email alias for the user via active directory. 
 
         .DESCRIPTION
-
-
+        Adds an email address for the user and the target domain to the active directory user account. Specifically, updates the ProxyAddresses attribute. 
 
         .PARAMETER Username
-
+        The username of the target active directory account. 
 
         .PARAMETER EmailDomain
+        The suffix of the email address. Include the @ symbol. 
 
         .INPUTS
-
+        Username accepts input from the pipeline.
 
         .OUTPUTS
-
+        None.
 
         .EXAMPLE
-
+        Add-EmailAlias -Username HWallace -EmailDomain '@contoso.com'
 
         .LINK
         Github source: https://github.com/SnoozingPinata/SamsADToolkit
