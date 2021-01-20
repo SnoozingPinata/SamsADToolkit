@@ -116,7 +116,7 @@ function Set-ComputerAssignment {
             Position=0,
             Mandatory=$true,
             ValueFromPipeline=$true)]
-        [string[]] $ComputerName,
+        [string] $ComputerName,
 
         [Parameter(
             Position=1)]
