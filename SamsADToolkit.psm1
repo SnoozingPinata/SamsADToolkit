@@ -401,7 +401,7 @@ function Start-ADCloudUpdate {
     }
 }
 
-function Start-ADHomeFolderMIgration {
+function Start-ADHomeFolderMigration {
     <#
         .SYNOPSIS
         Changes a user's home folder and moves the files to the new location. 
@@ -442,20 +442,42 @@ function Start-ADHomeFolderMIgration {
     )
 
     Begin {
-        Import-Module -name ActiveDirectory
-
+        Import-Module ActiveDirectory
     }
     
     Process {
+        if (-not (Test-Path -Path $NewHomeFolderPath)) {
+            throw "Test Connection to NewHomeFolderPath failed."
+        }
+
+        ## properties used: HomeDirectory, SamAccountName, 
         $targetAccount = Get-ADUser -Identity $Identity -Properties *
+
+        if (-not $targetAccount) {
+            throw "Active Directory query on Identity parameter returned null or false."
+        }
+
+        $oldPath = $targetAccount.HomeDirectory
         
+        if (-not (Test-Path -Path $oldPath)) {
+            throw "Test Connection to target's current Home Directory failed."
+        }
 
+        $newFullPath = Join-Path -Path $NewHomeFolderPath -ChildPath $targetAccount.SamAccountName
+        
+        Set-ADUser -Identity $targetAccount.SamAccountName -HomeDirectory $newFullPath
+
+        Get-ChildItem -Path $oldPath -Recurse | Move-Item -Destination $newFullPath
+
+        if (Get-ChildItem -Path $oldPath -eq $null) {
+            Remove-Item -Path $oldPath
+            Write-Verbose -Message "$($targetAccount.SamAccountName) - Success"
+        } else {
+            Write-Verbose -Message "$($targetAccount.SamAccountName) - Failure"
+        }
     }
-
-
 
     End {
 
     }
-
 }

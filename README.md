@@ -18,3 +18,6 @@ Add-EmailAlias
 
 Start-ADCloudUpdate
     Sends local server the command to begin a delta sync with O365.
+
+Start-ADHomeFolderMigration
+    Changes a user's home folder and moves the files to the new location.
