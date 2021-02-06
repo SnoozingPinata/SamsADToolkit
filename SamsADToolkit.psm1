@@ -464,10 +464,16 @@ function Start-ADHomeFolderMigration {
         }
 
         $newFullPath = Join-Path -Path $NewHomeFolderPath -ChildPath $targetAccount.SamAccountName
+
+        if ($oldPath -eq $newFullPath) {
+            throw "The user's Home Folder Path is already set to the value you are changing it to."
+        }
         
         Set-ADUser -Identity $targetAccount.SamAccountName -HomeDirectory $newFullPath
 
-        Get-ChildItem -Path $oldPath -Recurse | Move-Item -Destination $newFullPath
+        Get-ChildItem -Path $oldPath | ForEach-Object -Process {
+            Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
+        }
 
         if (Get-ChildItem -Path $oldPath -eq $null) {
             Remove-Item -Path $oldPath
