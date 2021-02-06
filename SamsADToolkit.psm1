@@ -1,3 +1,9 @@
+## TODO
+## Break out the Set-ComputerAssignment -RemoveAssignment parameter into a Remove-ComputerAssignment cmndlet and allow input from pipeline
+## Should change Copy-GroupMembership into something like Compare-GroupMembers and then just allow the user to pipe the results to remove members or add members etc.
+## Break Disable-OldComputers into a few different comandlets: Get-StaleADComputers, Disable-StaleADComputers, Remove-StaleADComputers
+## Add new commandlets for migrating home folders
+
 function Get-ComputerAssignment {
     <#
         .SYNOPSIS
@@ -393,4 +399,63 @@ function Start-ADCloudUpdate {
         }
         Start-ADSyncSyncCycle -PolicyType Delta
     }
+}
+
+function Start-ADHomeFolderMIgration {
+    <#
+        .SYNOPSIS
+        Changes a user's home folder and moves the files to the new location. 
+
+        .DESCRIPTION
+        Changes a user's home folder and moves the files to the new location. 
+
+        .PARAMETER Identity
+        The username of the target active directory account. 
+
+        .PARAMETER NewHomeFolderPath
+        The directory where the new home folder will be made.  
+
+        .INPUTS
+        Identity accepts input from the pipeline.
+
+        .OUTPUTS
+        None.
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
+    [Cmdletbinding()]
+    Param(
+        [Parameter(
+            Position=0,
+            ValueFromPipeline=$true,
+            Mandatory=$true
+        )]
+        [string] $Identity,
+
+        [Parameter()]
+        [string] $NewHomeFolderPath
+    )
+
+    Begin {
+        Import-Module -name ActiveDirectory
+
+    }
+    
+    Process {
+        $targetAccount = Get-ADUser -Identity $Identity -Properties *
+        
+
+    }
+
+
+
+    End {
+
+    }
+
 }
