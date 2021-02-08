@@ -478,7 +478,7 @@ function Start-ADHomeFolderMigration {
         }
 
         # Checks to see if anything is left in the old path. If it's empty, deletes the old folder.
-        if (Get-ChildItem -Path $oldPath -eq $null) {
+        if ($null -eq (Get-ChildItem -Path $oldPath)) {
             Remove-Item -Path $oldPath
             Write-Verbose -Message "$($targetAccount.SamAccountName) - Success"
         } else {
