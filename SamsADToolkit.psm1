@@ -450,7 +450,7 @@ function Start-ADHomeFolderMigration {
             throw "Test Connection to NewHomeFolderPath failed."
         }
 
-        ## properties used: HomeDirectory, SamAccountName, 
+        # properties used: HomeDirectory, SamAccountName, SID
         $targetAccount = Get-ADUser -Identity $Identity -Properties *
 
         if (-not $targetAccount) {
@@ -466,21 +466,40 @@ function Start-ADHomeFolderMigration {
         $newFullPath = Join-Path -Path $NewHomeFolderPath -ChildPath $targetAccount.SamAccountName
 
         if ($oldPath -eq $newFullPath) {
-            throw "The user's Home Folder Path is already set to the value you are changing it to."
+            throw "The user's old Home Folder Path is the same as the new Home Folder Path. Cannot move to the source location."
         }
         
+        # Changes the property on the user's AD account.
         Set-ADUser -Identity $targetAccount.SamAccountName -HomeDirectory $newFullPath
 
+        # Moves everything from the old path to the new path.
         Get-ChildItem -Path $oldPath | ForEach-Object -Process {
             Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
         }
 
+        # Checks to see if anything is left in the old path. If it's empty, deletes the old folder.
         if (Get-ChildItem -Path $oldPath -eq $null) {
             Remove-Item -Path $oldPath
             Write-Verbose -Message "$($targetAccount.SamAccountName) - Success"
         } else {
             Write-Verbose -Message "$($targetAccount.SamAccountName) - Failure"
         }
+
+        # Gets the current ACL for the new Home Folder.
+        $acl = Get-Acl -Path $newFullPath
+
+        # Creates an ACL entry with specified settings for the targetAccount ADUser.
+        $FileSystemRights = [System.Security.AccessControl.FileSystemRights]"Modify"
+        $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
+        $InheritanceFlags = [System.Security.AccessControl.InheritanceFlags]"ContainerInherit, ObjectInherit"
+        $PropagationFlags = [System.Security.AccessControl.PropagationFlags]"InheritOnly"
+        $accessRule = New-Object System.Security.AccessControl.FileSystemAccessRule ($targetAccount.SID, $FileSystemRights, $InheritanceFlags, $PropagationFlags, $AccessControlType)
+
+        # Adds the new ACL object to the variable pulled earlier from the new Home Folder
+        $acl.AddAccessRule($accessRule)
+
+        # Sets the acl value on the new home folder to the acl object we pulled and modified.
+        Set-Acl -Path $newFullPath -AclObject $acl
     }
 
     End {
