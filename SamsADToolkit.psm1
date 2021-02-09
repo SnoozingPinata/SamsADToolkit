@@ -1,7 +1,7 @@
 ## TODO
 ## Break out the Set-ComputerAssignment -RemoveAssignment parameter into a Remove-ComputerAssignment cmndlet and allow input from pipeline
 ## Should change Copy-GroupMembership into something like Compare-GroupMembers and then just allow the user to pipe the results to remove members or add members etc.
-## Break Disable-OldComputers into a few different comandlets: Get-StaleADComputers, Disable-StaleADComputers, Remove-StaleADComputers
+## Break Disable-OldComputers into a few different comandlets: Get-StaleADComputers, Disable-StaleADComputers, Remove-StaleADComputers (Remove-DisabledComputers(???))
 ## Add new commandlets for migrating home folders
 
 function Get-ComputerAssignment {
@@ -217,6 +217,77 @@ function Copy-GroupMembership {
     }
 }
 
+function Get-StaleADComputers {
+        <#
+        .SYNOPSIS
+        Returns the computer accounts within Active Directory that have not been logged into in 60 days.
+
+        .DESCRIPTION
+        Returns all computers that have not logged in for 60 days.
+        The amount of days to check against can be changed with the InactivityThreshold parameter.
+
+        .PARAMETER InactivityThreshold
+        Default is set to 60 days.
+
+        .PARAMETER StaleComputersOU
+        Distinguished name of an Organizational Unit that disabled computers should be moved to. 
+
+        .INPUTS
+        StaleComputersOU accepts a distinguished name for an organizational unit from the pipeline.
+
+        .OUTPUTS
+        Returns Microsoft.ActiveDirectory.Management.ADComputer object when StaleComputersOU is not specified
+
+        .EXAMPLE
+        Get-StaleADComputers -InactivityThreshold 30
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
+    [CmdletBinding()]
+    Param(
+        [Parameter(
+            Position=0,
+            ValueFromPipeline=$true,
+            Mandatory=$false
+        )]
+        [string] $StaleComputersOU,
+
+        [Parameter()]
+        [int] $InactivityThreshold = 60
+    )
+
+    Begin {
+        Import-Module -Name ActiveDirectory
+    }
+
+    Process {
+        if ($InactivityThreshold -lt 14) {
+            throw "InactivityThreshold parameter must be at least 15 days"
+        }
+
+        $cutOffDate = (Get-Date).AddDays(-($InactivityThreshold))
+        $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
+
+        if ($StaleComputersOU) {
+            foreach ($computer in $allComputersList) {
+                Move-ADObject -Identity $computer.ObjectGUID -TargetPath $StaleComputersOU
+            }
+        } else {
+            $allComputersList
+        }
+    }
+
+    End {
+
+    }
+}
+
+# Need to change the name of this commandlet
 function Disable-OldComputers {
     <#
         .SYNOPSIS
@@ -252,7 +323,7 @@ function Disable-OldComputers {
     Param(
         [Parameter(
             Position=0)]
-        [int] $InactivityThreshold = 90,
+        [int] $InactivityThreshold = 60,
 
         [Parameter(
             Position=1,
