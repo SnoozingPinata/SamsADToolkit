@@ -60,7 +60,7 @@ function Get-ComputerAssignment {
         # Return the name of all enabled computers that are not assigned in AD.
         # Should rewrite this to use the filter instead of ForEach-Object and if.
         if ($Unassigned) {
-            Get-ADComputer -Filter "Enabled -eq '$true'" -Properties * -SearchBase $_ | ForEach-Object -Process {
+            Get-ADComputer -Filter "Enabled -eq '$true'" -Properties ManagedBy | ForEach-Object -Process {
                 If (-Not $_.ManagedBy) {
                     Write-Output $_.Name
                 }
