@@ -489,7 +489,7 @@ function Start-ADHomeFolderMigration {
         $acl = Get-Acl -Path $newFullPath
 
         # Creates an ACL entry with specified settings for the targetAccount ADUser.
-        $FileSystemRights = [System.Security.AccessControl.FileSystemRights]"Modify"
+        $FileSystemRights = [System.Security.AccessControl.FileSystemRights]"FullControl"
         $AccessControlType = [System.Security.AccessControl.AccessControlType]::Allow
         $InheritanceFlags = [System.Security.AccessControl.InheritanceFlags]"ContainerInherit, ObjectInherit"
         $PropagationFlags = [System.Security.AccessControl.PropagationFlags]"InheritOnly"
