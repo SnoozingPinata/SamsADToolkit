@@ -534,58 +534,81 @@ function Start-ADHomeFolderMigration {
     )
     
     Process {
+        Write-Debug -Message "Script Start."
+
+        Write-Debug -Message "Testing path to $($NewHomeFolderPath)"
         if (-not (Test-Path -Path $NewHomeFolderPath)) {
+            Write-Debug -Message "Test Path to $($NewHomeFolderPath) Failed."
             throw "Test Connection to NewHomeFolderPath failed."
+        } else {
+            Write-Debug -Message "Test Path to $($NewHomeFolderPath) Succeeded."
         }
 
+        Write-Debug -Message "Testing Identity parameter."
         if (Test-ADUser -Identity $Identity) {
+            Write-Debug -Message "Test-ADUser on $($Identity) Succeeded."
             # properties used: HomeDirectory, SamAccountName, SID
             $targetAccount = Get-ADUser -Identity $Identity -Properties *
         } else {
+            Write-Debug -Message "Test-ADUser on $($Identity) Failed."
             throw "Test-ADUser for account name $($Identity) returned False."
         }
 
+        Write-Debug -Message "Storing Old Home Directory in Variable."
         $oldPath = $targetAccount.HomeDirectory
         
+        Write-Debug -Message "Testing Path to $($oldPath)"
         if (-not (Test-Path -Path $oldPath)) {
+            Write-Debug -Message "Test Path to $($oldPath) Failed."
             throw "Test Connection to target's current Home Directory failed."
+        } else {
+            Write-Debug -Message "Test Path to $($oldPath) Succeeded."
         }
 
+        Write-Debug -Message "Creating new Home Folder Path directory name and storing in variable."
         $newFullPath = Join-Path -Path $NewHomeFolderPath -ChildPath $targetAccount.SamAccountName
 
+        Write-Debug -Message "Testing to see if the Path set in Active Directory is the same as the new destination path."
         if ($oldPath -eq $newFullPath) {
+            Write-Debug -Message "Old Path and New Path are the same."
             throw "The user's old Home Folder Path is the same as the new Home Folder Path. Cannot move to the source location."
+        } else {
+            Write-Debug -Message "Old Path and New Path are different."
         }
         
+        Write-Debug -Message "Changing property on AD Account."
         # Changes the property on the user's AD account.
         Set-ADUser -Identity $targetAccount.SamAccountName -HomeDirectory $newFullPath
 
-        # Moves everything from the old path to the new path.
-        <#
-        Get-ChildItem -Path $oldPath | ForEach-Object -Process {
-            Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
-        }
-        #>
-
+        Write-Debug -Message "Starting move operation."
         # Moves everything from the old path to the new path.
         $oldPathContent = Get-ChildItem -Path $oldPath
         $itemCount = $oldPathContent.count
-        $counter = 1
         foreach ($item in $itemCount) {
+            Write-Debug -Message "Moving $(Join-Path $oldPath -ChildPath $_.Name) to $($newFullPath). Item Number: $($item)"
             Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
-            Write-Progress -Activity "Moving Files" -PercentComplete ($counter/$itemCount * 100)
-            $counter += 1
+            Write-Progress -Activity "Moving Files" -PercentComplete ($item/$itemCount * 100)
+            Start-Sleep -Seconds 1
         }
 
+        Write-Debug -Message "Testing to see if old directory still exists."
         # Checks to see if anything is left in the old path. If it's empty, deletes the old folder.
-        if ($null -eq (Get-ChildItem -Path $oldPath)) {
-            Remove-Item -Path $oldPath
-            Write-Verbose -Message "$($targetAccount.SamAccountName) - Success"
+        if (Test-Path -Path $oldPath) {
+            Write-Debug -Message "Old Directory still exists. Checking to see if it is empty."
+            if ($null -eq (Get-ChildItem -Path $oldPath)) {
+                Write-Debug -Message "Old directory is empty. Removing directory."
+                Remove-Item -Path $oldPath
+                Write-Verbose -Message "$($targetAccount.SamAccountName) - Success"
+            } else {
+                Write-Debug -Message "Old directory is not empty!"
+                Write-Verbose -Message "$($targetAccount.SamAccountName) - Failure"
+            }
         } else {
-            Write-Verbose -Message "$($targetAccount.SamAccountName) - Failure"
+            Write-Debug -Message "Old Directory no longer exists."
         }
 
-        Write-Verbose -Message "Waiting 15s for permissions to update."
+        Write-Debug -Message "Starting Timer to wait before updating permissions."
+        Write-Verbose -Message "Waiting 20 seconds for permissions to update."
         Start-Sleep -Seconds 20
 
         # Gets the current ACL for the new Home Folder.
