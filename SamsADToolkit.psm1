@@ -484,9 +484,9 @@ function Test-ADUser {
 
     Process {
         if (!(Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'")) {
-            return False
+            return $False
         } elseif (Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'") {
-            return True
+            return $True
         } else {
             throw "An Unknown Error Occurred."
         }
