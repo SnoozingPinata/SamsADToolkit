@@ -472,6 +472,27 @@ function Start-ADCloudUpdate {
     }
 }
 
+function Test-ADUser {
+    [CmdletBinding()]
+    Param (
+        [Parameter(
+            Mandatory=$true,
+            ValueFromPipeline=$true,
+            Position=0)]
+        $Identity
+    )
+
+    Process {
+        if (!(Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'")) {
+            return False
+        } elseif (Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'") {
+            return True
+        } else {
+            throw "An Unknown Error Occurred."
+        }
+    }
+}
+
 function Start-ADHomeFolderMigration {
     <#
         .SYNOPSIS
@@ -511,21 +532,17 @@ function Start-ADHomeFolderMigration {
         [Parameter()]
         [string] $NewHomeFolderPath
     )
-
-    Begin {
-        Import-Module ActiveDirectory
-    }
     
     Process {
         if (-not (Test-Path -Path $NewHomeFolderPath)) {
             throw "Test Connection to NewHomeFolderPath failed."
         }
 
-        # properties used: HomeDirectory, SamAccountName, SID
-        $targetAccount = Get-ADUser -Identity $Identity -Properties *
-
-        if (-not $targetAccount) {
-            throw "Active Directory query on Identity parameter returned null or false."
+        if (Test-ADUser -Identity $Identity) {
+            # properties used: HomeDirectory, SamAccountName, SID
+            $targetAccount = Get-ADUser -Identity $Identity -Properties *
+        } else {
+            throw "Test-ADUser for account name $($Identity) returned False."
         }
 
         $oldPath = $targetAccount.HomeDirectory
@@ -544,8 +561,19 @@ function Start-ADHomeFolderMigration {
         Set-ADUser -Identity $targetAccount.SamAccountName -HomeDirectory $newFullPath
 
         # Moves everything from the old path to the new path.
+        <#
         Get-ChildItem -Path $oldPath | ForEach-Object -Process {
             Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
+        }
+        #>
+
+        # Moves everything from the old path to the new path.
+        $oldPathContent = Get-ChildItem -Path $oldPath
+        $itemCount = $oldPathContent.count
+        foreach ($item in $oldPathContent) {
+            $counter = 1
+            Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
+            Write-Progress -Activity "Moving Files" -PercentComplete ($counter/$itemCount * 100)
         }
 
         # Checks to see if anything is left in the old path. If it's empty, deletes the old folder.
@@ -571,9 +599,5 @@ function Start-ADHomeFolderMigration {
 
         # Sets the acl value on the new home folder to the acl object we pulled and modified.
         Set-Acl -Path $newFullPath -AclObject $acl
-    }
-
-    End {
-
     }
 }
