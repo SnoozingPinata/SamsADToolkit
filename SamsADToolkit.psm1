@@ -494,6 +494,7 @@ function Test-ADUser {
 }
 
 function Start-ADHomeFolderMigration {
+    # Run as a domain administrator with full file share permissions on old file share location and new file share location.
     <#
         .SYNOPSIS
         Changes a user's home folder and moves the files to the new location. 
