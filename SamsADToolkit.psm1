@@ -570,10 +570,11 @@ function Start-ADHomeFolderMigration {
         # Moves everything from the old path to the new path.
         $oldPathContent = Get-ChildItem -Path $oldPath
         $itemCount = $oldPathContent.count
-        foreach ($item in $oldPathContent) {
-            $counter = 1
+        $counter = 1
+        foreach ($item in $itemCount) {
             Move-Item -Path (Join-Path $oldPath -ChildPath $_.Name) -Destination $newFullPath
             Write-Progress -Activity "Moving Files" -PercentComplete ($counter/$itemCount * 100)
+            $counter += 1
         }
 
         # Checks to see if anything is left in the old path. If it's empty, deletes the old folder.
@@ -583,6 +584,9 @@ function Start-ADHomeFolderMigration {
         } else {
             Write-Verbose -Message "$($targetAccount.SamAccountName) - Failure"
         }
+
+        Write-Verbose -Message "Waiting 15s for permissions to update."
+        Start-Sleep -Seconds 20
 
         # Gets the current ACL for the new Home Folder.
         $acl = Get-Acl -Path $newFullPath
