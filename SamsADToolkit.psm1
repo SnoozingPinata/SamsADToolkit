@@ -1,8 +1,3 @@
-## TODO
-## Break out the Set-ComputerAssignment -RemoveAssignment parameter into a Remove-ComputerAssignment cmndlet and allow input from pipeline
-## Should change Copy-GroupMembership into something like Compare-GroupMembers and then just allow the user to pipe the results to remove members or add members etc.
-## Break Disable-OldComputers into a few different comandlets: Get-StaleADComputers, Disable-StaleADComputers, Remove-StaleADComputers (Remove-DisabledComputers(???))
-## Add new commandlets for migrating home folders
 
 function Get-ComputerAssignment {
     <#
@@ -24,6 +19,7 @@ function Get-ComputerAssignment {
 
         .OUTPUTS
         Writes the name of the computer object.
+        If called without defining the username or using the unassigned switch, returns a hash table of each computer's hostname as the key and the ManagedBy attribute as the value.
 
         .EXAMPLE
         Get-ComputerAssignment -Unassigned
@@ -56,20 +52,21 @@ function Get-ComputerAssignment {
     }
 
     Process {
-        # Runs if the $Unassigned switch was used. 
-        # Return the name of all enabled computers that are not assigned in AD.
-        # Should rewrite this to use the filter instead of ForEach-Object and if.
         if ($Unassigned) {
             Get-ADComputer -Filter "Enabled -eq '$true'" -Properties ManagedBy | ForEach-Object -Process {
-                If (-Not $_.ManagedBy) {
+                If ($null -eq $_.ManagedBy) {
                     Write-Output $_.Name
                 }
             }
         } elseif ($UserName){
-            # Searches AD for computers that have a ManagedBy attribute equal to the username parameter.
             (Get-ADComputer -Filter "ManagedBy -eq '$UserName'").Name
         } else {
-            throw "UserName is not defined and Unassigned switch was not used. Use Get-Help Get-ComputerAssignment -full for details."
+            $returnHash = @{}
+
+            Get-ADComputer -Filter "Enabled -eq '$true'" -Properties ManagedBy | ForEach-Object -Process {
+                $returnHash.Add($_.Name, $_.ManagedBy)
+            }
+            return $returnHash
         }
     }
 
@@ -77,34 +74,70 @@ function Get-ComputerAssignment {
     }
 }
 
-function Set-ComputerAssignment {
-        <#
+function Remove-ComputerAssignment {
+    <#
         .SYNOPSIS
-        Sets the computer's managedby attribute to the username of the input user. Also sets the description to the username.
+        Removes the user assignment on the specified computer account.
 
         .DESCRIPTION
-        Sets the computer's managedby attribute to the user given.
-        Requires username and computername input. 
-        Accepts username input from pipeline. 
-
-        .PARAMETER UserName
-        Required if not using the RemoveAssignment switch.
-        Type the username of the user you are assigning the computer to.
+        Clears the ManagedBy attribute and the Description of the specified computer account.
 
         .PARAMETER ComputerName
-        Always required. This is the computer name 
+        Identifier for the computer: Distinguished Name, GUID, SID, SAM account name, or a computer object passed through the pipeline.
 
-        .PARAMETER RemoveAssignment
-        Switch: Clears the assignment on the specified computer in AD. Adds a description with the date/time.
+        .INPUTS
+        ComputerName accepts input from pipeline.
+
+        .OUTPUTS
+        No Output
+
+        .EXAMPLE
+        Remove-ComputerAssignment -ComputerName comp01
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+    Param (
+        [Parameter(
+            Position=0,
+            Mandatory=$true,
+            ValueFromPipeline=$true)]
+        [string] $ComputerName
+    )
+
+    Begin {
+    }
+
+    Process {
+        Set-ADComputer -Identity $ComputerName -Clear ManagedBy, Description
+    }
+
+    End {
+    }
+}
+
+function Set-ComputerAssignment {
+    <#
+        .SYNOPSIS
+        Sets the computer's managedby and description attributes to the given username.
+
+        .DESCRIPTION
+        Sets the computer's managedby and description attributes to the given username.
+
+        .PARAMETER ComputerName
+        Identifier for the computer: Distinguished Name, GUID, SID, SAM account name, or a computer object passed through the pipeline.
+
+        .PARAMETER UserName
+        Identifier for the user: Distinguished Name, GUID, SID, SAM account name, or a user object.
 
         .INPUTS
         ComputerName accepts value from pipeline as a string.
 
         .OUTPUTS
         None.
-
-        .EXAMPLE
-        Set-ComputerAssignment -ComputerName Desktop01 -RemoveAssignment
 
         .EXAMPLE
         Set-ComputerAssignment -ComputerName Desktop01 -UserName HWallace
@@ -125,26 +158,15 @@ function Set-ComputerAssignment {
         [string] $ComputerName,
 
         [Parameter(
-            Position=1)]
-        [string] $UserName,
-
-        [Parameter()]
-        [switch] $RemoveAssignment
+            Position=1,
+            Mandatory=$true)]
+        [string] $UserName
     )
 
     Begin {
     }
 
     Process {
-        # if RemoveAssignment switch was used, clears the ManagedBy attribute for the computer in AD. Changes the description.
-            # if RemoveAssignment is not set, checks to make sure UserName parameter is defined.
-                # if UserName is not defined, throws an error explaining UserName is required when not using the RemoveAssignment switch
-        if ($RemoveAssignment) {
-            Set-ADComputer -Identity $ComputerName -Clear ManagedBy -Description "Unassigned via script on $(Get-Date)"
-        } elseif (-not $($UserName)) {
-            throw "Either Username must be defined or RemoveAssignment switch must be used."
-        }
-        # Updates the ManagedBy attribute in AD with the user's username. Updates the Description.
         Set-ADComputer -Identity $($ComputerName) -ManagedBy (Get-ADUser -Identity $($UserName)) -Description $($UserName)
     }
 
@@ -155,16 +177,16 @@ function Set-ComputerAssignment {
 function Copy-GroupMembership {
     <#
         .SYNOPSIS
-        Gets all the members in group one and adds them to another group.
+        Adds all of th emembers in the Original Group to the Destination Group.
 
         .DESCRIPTION
-        Gets all the members in group one and adds them to another group. Note that it does not remove any additional members from group two. 
+        Adds all of th emembers in the Original Group to the Destination Group. Note that it does not remove any additional members from group two. 
 
         .PARAMETER OriginalGroup
-        This is the group you want to get all the members from.
+        The group you are copying membership from: Distinguished Name, GUID, SID, SAM account name, canonical name, or group object.
 
         .PARAMETER DestinationGroup
-        This is the group that is going to get all of the members that the Orginal Group has.
+        The group that will have members added to it: Distinguished Name, GUID, SID, SAM account name, canonical name, or group object.
 
         .INPUTS
         OriginalGroup accepts pipeline input.
@@ -200,16 +222,24 @@ function Copy-GroupMembership {
     }
 
     Process {
-        $initialCount = (Get-ADGroupMember -Identity $DestinationGroup).count
-
-        Get-ADGroupMember -Identity $OriginalGroup | ForEach-Object -Process {
-            Add-ADGroupMember -Identity $DestinationGroup -Members $_.distinguishedName
+        try {
+            $originalGroupAccount = Get-ADGroup -Identity $OriginalGroup
+            $destinationGroupAccount = Get-ADGroup -Identity $DestinationGroup
+        } catch {
+            throw "Failed to find group(s) in Active Directory."
         }
-    
-        # This is not good validation. Can get a list of both arrays and use compare-object to check. 
-        # Need to rewrite this in the future.
-        If ((Get-ADGroupMember -Identity $DestinationGroup).count -gt $initialCount) {
-            Write-Verbose "Transfer Successful."
+
+        $originalGroupMembers = (Get-ADGroupMember -Identity $originalGroupAccount).distinguishedName
+        $destinationGroupMembers = (Get-ADGroupMember -Identity $destinationGroupAccount).distinguishedName
+
+        if ($null -eq $destinationGroupMembers) {
+            Add-ADGroupMember -Identity $destinationGroupAccount -Members $originalGroupMembers
+        } else {
+            foreach ($member in $originalGroupMembers) {
+                if (-not $destinationGroupMembers.contains($member)) {
+                    Add-ADGroupMember -Identity $destinationGroupAccount -Members $member
+                }
+            }
         }
     }
 
@@ -218,22 +248,18 @@ function Copy-GroupMembership {
 }
 
 function Get-StaleADComputers {
-        <#
+    <#
         .SYNOPSIS
-        Returns the computer accounts within Active Directory that have not been logged into in 60 days.
+        Returns the computer accounts within Active Directory that have not logged in for in 60 days or the amount of days set by InactivityThreshold.
 
         .DESCRIPTION
-        Returns all computers that have not logged in for 60 days.
-        The amount of days to check against can be changed with the InactivityThreshold parameter.
+        Returns the computer accounts within Active Directory that have not logged in for in 60 days or the amount of days set by InactivityThreshold.
 
         .PARAMETER InactivityThreshold
-        Default is set to 60 days.
-
-        .PARAMETER StaleComputersOU
-        Distinguished name of an Organizational Unit that disabled computers should be moved to. 
+        The amount of days the computer has to have been inactive in order to be in the result. The default is set to 60 days.
 
         .INPUTS
-        StaleComputersOU accepts a distinguished name for an organizational unit from the pipeline.
+        InactivityThreshold accepts an integer from the pipeline.
 
         .OUTPUTS
         Returns Microsoft.ActiveDirectory.Management.ADComputer object when StaleComputersOU is not specified
@@ -255,14 +281,10 @@ function Get-StaleADComputers {
             ValueFromPipeline=$true,
             Mandatory=$false
         )]
-        [string] $StaleComputersOU,
-
-        [Parameter()]
         [int] $InactivityThreshold = 60
     )
 
     Begin {
-        Import-Module -Name ActiveDirectory
     }
 
     Process {
@@ -271,84 +293,7 @@ function Get-StaleADComputers {
         }
 
         $cutOffDate = (Get-Date).AddDays(-($InactivityThreshold))
-        $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
-
-        if ($StaleComputersOU) {
-            foreach ($computer in $allComputersList) {
-                Move-ADObject -Identity $computer.ObjectGUID -TargetPath $StaleComputersOU
-            }
-        } else {
-            $allComputersList
-        }
-    }
-
-    End {
-
-    }
-}
-
-# Need to change the name of this commandlet
-function Disable-OldComputers {
-    <#
-        .SYNOPSIS
-        Disables computer accounts within Active Directory that have not been logged into in 90 days.
-
-        .DESCRIPTION
-        Disables all computers that have not logged in for 90 days.
-        The amount of days to check against can be changed with the InactivityThreshold parameter.
-
-        .PARAMETER InactivityThreshold
-        Default is set to 90 days.
-
-        .PARAMETER DisabledComputersOU
-        Distinguished name of an Organizational Unit that disabled computers should be moved to. 
-
-        .INPUTS
-        DisabledComputersOU accepts a distinguished name for an organizational unit from the pipeline.
-
-        .OUTPUTS
-        None.
-
-        .EXAMPLE
-        Disable-OldComputers -InactivityThreshold 60
-
-        .LINK
-        Github source: https://github.com/SnoozingPinata/SamsADToolkit
-
-        .LINK
-        Author's website: www.samuelmelton.com
-    #>
-
-    [CmdletBinding()]
-    Param(
-        [Parameter(
-            Position=0)]
-        [int] $InactivityThreshold = 60,
-
-        [Parameter(
-            Position=1,
-            Mandatory=$false,
-            ValueFromPipeline=$true)]
-        [string] $DisabledComputersOU
-    )
-
-    Begin {
-    }
-
-    Process {
-        $cutoffDate = (Get-Date).AddDays(-($InactivityThreshold))
-        $allComputersList = Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
-    
-        if ($DisabledComputersOU) {
-            foreach ($computer in $allComputersList) {
-                Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
-                Move-ADObject -Identity $computer.ObjectGUID -TargetPath $DisabledComputersOU
-            }
-        } else {
-            foreach ($computer in $allComputersList) {
-                Set-ADComputer $computer -Enabled $false -Description "Computer Account disabled via AD Computer Cleanup Script. - $(Get-Date)"
-            }
-        }
+        return Get-ADComputer -Filter {(LastLogonTimeStamp -lt $cutoffDate) -and (enabled -eq $true)}
     }
 
     End {
@@ -367,7 +312,7 @@ function Add-EmailAlias {
         The username of the target active directory account. 
 
         .PARAMETER EmailDomain
-        The suffix of the email address. Include the @ symbol. 
+        The suffix of the email address.
 
         .INPUTS
         Username accepts input from the pipeline.
@@ -376,7 +321,7 @@ function Add-EmailAlias {
         None.
 
         .EXAMPLE
-        Add-EmailAlias -Username HWallace -EmailDomain '@contoso.com'
+        Add-EmailAlias -Username HWallace -EmailDomain 'contoso.com'
 
         .LINK
         Github source: https://github.com/SnoozingPinata/SamsADToolkit
@@ -403,8 +348,14 @@ function Add-EmailAlias {
     }
 
     Process {
-        $userObject = Get-ADUser -Identity $Username -Properties "proxyaddresses"
-        $newEmailAddress = $($userObject.SamAccountName) + $($EmailDomain)
+        $userObject = Get-ADUser -Identity $Username -Properties proxyaddresses, mail
+        $newEmailAddress = $($userObject.SamAccountName) + "@" + $($EmailDomain)
+
+        if (-not $userObject.proxyAddresses) {
+            if ($userObject.mail) {
+                Set-ADUser -Identity $userObject.ObjectGUID -add @{ProxyAddresses="SMTP:$($userObject.mail)"}
+            }
+        }
         Set-ADUser -Identity $userObject.ObjectGUID -add @{ProxyAddresses="smtp:$($newEmailAddress)"}
     }
 
@@ -483,9 +434,11 @@ function Test-ADUser {
     )
 
     Process {
-        if (!(Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'")) {
+        $query = (Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'")
+
+        if ($null -eq $query) {
             return $False
-        } elseif (Get-ADUser -Filter "SAMAccountName -eq '$($Identity)'") {
+        } elseif ($query) {
             return $True
         } else {
             throw "An Unknown Error Occurred."
@@ -494,10 +447,10 @@ function Test-ADUser {
 }
 
 function Start-ADHomeFolderMigration {
-    # Run as a domain administrator with full file share permissions on old file share location and new file share location.
     <#
         .SYNOPSIS
-        Changes a user's home folder and moves the files to the new location. 
+        Changes a user's home folder and moves the files to the new location.
+        Run as a domain administrator with full file share permissions on old file share location and new file share location.
 
         .DESCRIPTION
         Changes a user's home folder and moves the files to the new location. 
@@ -509,7 +462,7 @@ function Start-ADHomeFolderMigration {
         The directory where the new home folder will be made.  
 
         .INPUTS
-        Identity accepts input from the pipeline.
+        Identity parameter accepts input from the pipeline.
 
         .OUTPUTS
         None.
