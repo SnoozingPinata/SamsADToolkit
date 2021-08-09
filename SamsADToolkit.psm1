@@ -177,10 +177,10 @@ function Set-ComputerAssignment {
 function Copy-GroupMembership {
     <#
         .SYNOPSIS
-        Adds all of th emembers in the Original Group to the Destination Group.
+        Adds all of the emembers in the Original Group to the Destination Group.
 
         .DESCRIPTION
-        Adds all of th emembers in the Original Group to the Destination Group. Note that it does not remove any additional members from group two. 
+        Adds all of the emembers in the Original Group to the Destination Group. Note that it does not remove any additional members from group two. 
 
         .PARAMETER OriginalGroup
         The group you are copying membership from: Distinguished Name, GUID, SID, SAM account name, canonical name, or group object.
@@ -424,6 +424,31 @@ function Start-ADCloudUpdate {
 }
 
 function Test-ADUser {
+    <#
+        .SYNOPSIS
+        Returns a boolean value if an account can be found with the given SAMAccountName.
+
+        .DESCRIPTION
+        Returns a boolean value if an account can be found with the given SAMAccountName.
+
+        .PARAMETER Identity
+        Mandatory. 
+
+        .INPUTS
+        Identity parameter accepts input from pipeline.
+
+        .OUTPUTS
+        Returns a boolean value.
+
+        .EXAMPLE
+        Test-ADUser -Identity smelton
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
     [CmdletBinding()]
     Param (
         [Parameter(
