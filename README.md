@@ -14,10 +14,11 @@ Set-ComputerAssignment
 
 Copy-GroupMembership
 * Adds all of the emembers in the Original Group to the Destination Group.
-* Note that it does not remove any additional members from group two. 
+* Note that it does not remove any additional members from the Destination Group.
+* (Accounts in Group 1 are added to Group 2 if they aren't already a member of Group 2.) 
 
 Get-StaleADComputers
-* Returns the computer accounts within Active Directory that have not logged in for in 60 days.
+* Returns the computer accounts within Active Directory that have not logged in for 60 days.
 * Use the InactivityThreshold parameter to set how many days the computer must have been inactive to be listed.
 
 Add-EmailAlias
