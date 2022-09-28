@@ -601,7 +601,7 @@ Function Write-Log {
         Write-Log -LogString "Onboarding Script Started" -LogFilePath $logFile
 
         .EXAMPLE
-        $logFile = 'C:\logs\onboarding_script.txt'
+        $logFile = 'C:\logs\print_service_status.txt'
         (Get-Service spooler).status | Write-Log -LogFilePath $logFile
 
         .LINK
