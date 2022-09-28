@@ -578,3 +578,59 @@ function Start-ADHomeFolderMigration {
         Set-Acl -Path $newFullPath -AclObject $acl
     }
 }
+
+Function Write-Log {
+    <#
+        .SYNOPSIS
+        Creates a log file if one does not exist. Writes the given "LogString" to the given log file with the current time/date.
+
+        .DESCRIPTION
+        Creates a log file if one does not exist. Writes the given "LogString" to the given log file with the current time/date.
+
+        .PARAMETER LogString
+        The string that you want written to the log file.
+
+        .PARAMETER LogFilePath
+        The full name of the file you want the log string written to. 
+
+        .INPUTS
+        LogString parameter accepts input from the pipeline.
+
+        .EXAMPLE
+        $logFile = 'C:\logs\onboarding_script.txt'
+        Write-Log -LogString "Onboarding Script Started" -LogFilePath $logFile
+
+        .EXAMPLE
+        $logFile = 'C:\logs\onboarding_script.txt'
+        (Get-Service spooler).status | Write-Log -LogFilePath $logFile
+
+        .LINK
+        Github source: https://github.com/SnoozingPinata/SamsADToolkit
+
+        .LINK
+        Author's website: www.samuelmelton.com
+    #>
+
+    [CmdletBinding()]
+    Param(
+        [Parameter(
+            Position=0,
+            ValueFromPipeline=$true,
+            Mandatory=$true
+        )]
+        [string] $LogString,
+
+        [Parameter(
+            Position=1,
+            Mandatory=$true
+        )]
+        [string] $LogFilePath
+    )
+    if (-not (Test-Path $logFilePath -ErrorAction SilentlyContinue)) {
+        New-Item $LogFilePath -ItemType File -Force -ErrorAction Stop
+    }
+
+    $timeStamp = (Get-Date).toString("yyyy/MM/dd HH:mm:ss")
+    $logMessage = "$timeStamp - $LogString`n"
+    Add-Content -Path $LogFilePath -Value $logMessage -ErrorAction Stop
+}
